@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+passlib[bcrypt]
+python-jose[cryptography]
+sqlalchemy
+psycopg2-binary
+python-multipart
+Pillow
+google-genai
