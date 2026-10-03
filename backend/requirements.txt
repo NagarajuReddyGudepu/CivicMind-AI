@@ -4,7 +4,7 @@ python-dotenv
 passlib[bcrypt]
 python-jose[cryptography]
 sqlalchemy
-psycopg2-binary
+psycopg[binary]
 python-multipart
 Pillow
 google-genai
