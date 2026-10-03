@@ -3,7 +3,8 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+
   preview: {
-    allowedHosts: ["civicmind-ai-frontend.onrender.com"],
-  },
+    allowedHosts: [".onrender.com"]
+  }
 });
