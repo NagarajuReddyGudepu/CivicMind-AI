@@ -45,7 +45,7 @@ export default function AdminLogin({ go, onLogin }) {
             console.error("Admin login error:", err);
 
             setError(
-                "Could not connect to the backend. Make sure the backend is running."
+                "Could not connect to the backend. Please try again."
             );
 
         } finally {
@@ -66,6 +66,48 @@ export default function AdminLogin({ go, onLogin }) {
                 <p>
                     Login to manage and resolve civic reports
                 </p>
+
+                {/* Administrator Information */}
+                <div className="admin-info-box">
+
+                    <strong>Administrator Access</strong>
+
+                    <span>
+                        This portal is for authorized civic
+                        administrators to monitor citizen reports,
+                        manage issue status, and track civic issues.
+                    </span>
+
+                    <small>
+                        In a real-world deployment, admin accounts
+                        are created securely by the system administrator
+                        and cannot be created through public registration.
+                    </small>
+
+                    {/* Demo Credentials */}
+                    <div className="demo-credentials">
+
+                        <strong>Hackathon Demo Credentials</strong>
+
+                        <div>
+                            <b>Admin Email:</b>{" "}
+                            admin@civicmind.ai
+                        </div>
+
+                        <div>
+                            <b>Admin Password:</b>{" "}
+                            CivicMind@Demo123
+                        </div>
+
+                        <small>
+                            These credentials are provided for
+                            hackathon testing and demonstration
+                            purposes only.
+                        </small>
+
+                    </div>
+
+                </div>
 
                 <form onSubmit={handleLogin}>
 
