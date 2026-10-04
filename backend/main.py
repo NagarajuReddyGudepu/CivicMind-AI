@@ -1,17 +1,18 @@
 
 import os
 import json
-import hashlib
 import uuid
 
 from io import BytesIO
 from pathlib import Path
-from datetime import datetime
 
 from dotenv import load_dotenv
 
 from passlib.context import CryptContext
 from jose import jwt
+
+import cloudinary
+import cloudinary.uploader
 
 from fastapi import (
     FastAPI,
@@ -49,12 +50,53 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 if not GOOGLE_API_KEY:
     raise RuntimeError(
-        "GOOGLE_API_KEY is not configured in .env"
+        "GOOGLE_API_KEY is not configured."
     )
 
 
 # =========================================================
-# 2. CREATE GEMINI CLIENT
+# 2. CLOUDINARY CONFIGURATION
+# =========================================================
+
+CLOUDINARY_CLOUD_NAME = os.getenv(
+    "CLOUDINARY_CLOUD_NAME"
+)
+
+CLOUDINARY_API_KEY = os.getenv(
+    "CLOUDINARY_API_KEY"
+)
+
+CLOUDINARY_API_SECRET = os.getenv(
+    "CLOUDINARY_API_SECRET"
+)
+
+
+if not CLOUDINARY_CLOUD_NAME:
+    raise RuntimeError(
+        "CLOUDINARY_CLOUD_NAME is not configured."
+    )
+
+if not CLOUDINARY_API_KEY:
+    raise RuntimeError(
+        "CLOUDINARY_API_KEY is not configured."
+    )
+
+if not CLOUDINARY_API_SECRET:
+    raise RuntimeError(
+        "CLOUDINARY_API_SECRET is not configured."
+    )
+
+
+cloudinary.config(
+    cloud_name=CLOUDINARY_CLOUD_NAME,
+    api_key=CLOUDINARY_API_KEY,
+    api_secret=CLOUDINARY_API_SECRET,
+    secure=True
+)
+
+
+# =========================================================
+# 3. CREATE GEMINI CLIENT
 # =========================================================
 
 client = genai.Client(
@@ -63,7 +105,7 @@ client = genai.Client(
 
 
 # =========================================================
-# 3. CREATE FASTAPI APPLICATION
+# 4. CREATE FASTAPI APPLICATION
 # =========================================================
 
 app = FastAPI(
@@ -72,7 +114,14 @@ app = FastAPI(
 
 
 # =========================================================
-# 4. UPLOAD DIRECTORY
+# 5. LEGACY UPLOAD DIRECTORY
+# =========================================================
+#
+# Kept only so old /uploads/... URLs do not cause
+# an application routing error.
+#
+# NEW images are NOT stored here.
+# New images are stored permanently in Cloudinary.
 # =========================================================
 
 UPLOAD_DIR = Path("uploads")
@@ -81,8 +130,6 @@ UPLOAD_DIR.mkdir(
     exist_ok=True
 )
 
-# Serve uploaded images through:
-# http://localhost:8000/uploads/filename.jpg
 
 app.mount(
     "/uploads",
@@ -92,7 +139,7 @@ app.mount(
 
 
 # =========================================================
-# 5. AUTHENTICATION CONFIGURATION
+# 6. AUTHENTICATION CONFIGURATION
 # =========================================================
 
 SECRET_KEY = os.getenv(
@@ -111,7 +158,7 @@ security = HTTPBearer()
 
 
 # =========================================================
-# 6. GET CURRENT USER
+# 7. GET CURRENT USER
 # =========================================================
 
 def get_current_user(
@@ -145,6 +192,9 @@ def get_current_user(
             "role": role
         }
 
+    except HTTPException:
+        raise
+
     except Exception:
 
         raise HTTPException(
@@ -154,7 +204,7 @@ def get_current_user(
 
 
 # =========================================================
-# 7. REQUIRE CITIZEN
+# 8. REQUIRE CITIZEN
 # =========================================================
 
 def require_citizen(
@@ -172,7 +222,7 @@ def require_citizen(
 
 
 # =========================================================
-# 8. REQUIRE ADMIN
+# 9. REQUIRE ADMIN
 # =========================================================
 
 def require_admin(
@@ -190,17 +240,17 @@ def require_admin(
 
 
 # =========================================================
-# 9. CORS CONFIGURATION
+# 10. CORS CONFIGURATION
 # =========================================================
 
 app.add_middleware(
     CORSMiddleware,
 
     allow_origins=[
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "https://civicmind-ai-frontend.onrender.com"
-],
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://civicmind-ai-frontend.onrender.com"
+    ],
 
     allow_credentials=True,
 
@@ -211,7 +261,7 @@ app.add_middleware(
 
 
 # =========================================================
-# 10. HOME ENDPOINT
+# 11. HOME ENDPOINT
 # =========================================================
 
 @app.get("/")
@@ -223,7 +273,7 @@ def home():
 
 
 # =========================================================
-# 11. HEALTH CHECK
+# 12. HEALTH CHECK
 # =========================================================
 
 @app.get("/health")
@@ -235,7 +285,7 @@ def health():
 
 
 # =========================================================
-# 12. PASSWORD HELPER FUNCTIONS
+# 13. PASSWORD HELPER FUNCTIONS
 # =========================================================
 
 def hash_password(
@@ -259,7 +309,7 @@ def verify_password(
 
 
 # =========================================================
-# 13. REGISTER
+# 14. REGISTER
 # =========================================================
 
 @app.post("/register")
@@ -377,10 +427,6 @@ async def register(
             user = result.mappings().first()
 
 
-        # -------------------------------------------------
-        # Return response
-        # -------------------------------------------------
-
         return {
 
             "success": True,
@@ -408,7 +454,7 @@ async def register(
 
 
 # =========================================================
-# 14. LOGIN
+# 15. LOGIN
 # =========================================================
 
 @app.post("/login")
@@ -486,10 +532,6 @@ async def login(
             ).mappings().first()
 
 
-        # -------------------------------------------------
-        # User not found
-        # -------------------------------------------------
-
         if not user:
 
             return {
@@ -551,10 +593,6 @@ async def login(
         )
 
 
-        # -------------------------------------------------
-        # Return login response
-        # -------------------------------------------------
-
         return {
 
             "success": True,
@@ -591,8 +629,10 @@ async def login(
             "error": f"Login failed: {str(e)}"
 
         }
+
+
 # =========================================================
-# 15. GET ALL USERS - ADMIN ONLY
+# 16. GET ALL USERS - ADMIN ONLY
 # =========================================================
 
 @app.get("/users")
@@ -615,7 +655,9 @@ async def get_users(
 
         with engine.connect() as connection:
 
-            result = connection.execute(query)
+            result = connection.execute(
+                query
+            )
 
             users = [
                 dict(row)
@@ -627,6 +669,7 @@ async def get_users(
             "users": users
         }
 
+
     except Exception as e:
 
         print(
@@ -634,11 +677,16 @@ async def get_users(
         )
 
         return {
+
             "success": False,
+
             "error": str(e)
+
         }
+
+
 # =========================================================
-# 15. IMAGE ANALYSIS ENDPOINT
+# 17. IMAGE ANALYSIS ENDPOINT
 # =========================================================
 
 @app.post("/analyze-image")
@@ -798,9 +846,9 @@ Return JSON only. Do not use Markdown.
         # -------------------------------------------------
 
         models = [
-    "gemini-3.5-flash-lite",
-    "gemini-3.1-flash-lite",
-]
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite"
+        ]
 
 
         response = None
@@ -948,10 +996,6 @@ Return JSON only. Do not use Markdown.
             }
 
 
-        # -------------------------------------------------
-        # Return AI result
-        # -------------------------------------------------
-
         return {
 
             "filename":
@@ -1011,7 +1055,6 @@ Return JSON only. Do not use Markdown.
             f"AI image analysis failed: {str(e)}"
         )
 
-
         return {
 
             "error":
@@ -1021,7 +1064,7 @@ Return JSON only. Do not use Markdown.
 
 
 # =========================================================
-# 16. GENERATE CIVIC COMPLAINT
+# 18. GENERATE CIVIC COMPLAINT
 # =========================================================
 
 @app.post("/generate-complaint")
@@ -1106,7 +1149,7 @@ Rules:
         ]
 
 
-        for model_name in models:
+        for model_name in models_to_try:
 
             try:
 
@@ -1192,6 +1235,10 @@ Rules:
 
     except Exception as e:
 
+        print(
+            f"Complaint generation error: {str(e)}"
+        )
+
         return {
 
             "error":
@@ -1201,7 +1248,7 @@ Rules:
 
 
 # =========================================================
-# 17. UPLOAD REPORT IMAGE
+# 19. UPLOAD REPORT IMAGE - CLOUDINARY
 # =========================================================
 
 @app.post("/upload-report-image")
@@ -1213,7 +1260,7 @@ async def upload_report_image(
     try:
 
         # -------------------------------------------------
-        # Read image
+        # Read uploaded image
         # -------------------------------------------------
 
         image_data = await file.read()
@@ -1238,20 +1285,20 @@ async def upload_report_image(
             BytesIO(image_data)
         )
 
-        image.verify()
+
+        # -------------------------------------------------
+        # Convert to RGB
+        # -------------------------------------------------
+
+        if image.mode != "RGB":
+
+            image = image.convert(
+                "RGB"
+            )
 
 
         # -------------------------------------------------
-        # Re-open after verify
-        # -------------------------------------------------
-
-        image = Image.open(
-            BytesIO(image_data)
-        ).convert("RGB")
-
-
-        # -------------------------------------------------
-        # Resize if necessary
+        # Resize large images
         # -------------------------------------------------
 
         MAX_SIZE = 1280
@@ -1265,37 +1312,66 @@ async def upload_report_image(
 
 
         # -------------------------------------------------
-        # Create unique filename
+        # Compress image in memory
         # -------------------------------------------------
 
-        filename = (
-            f"{uuid.uuid4().hex}.jpg"
-        )
-
-        file_path = (
-            UPLOAD_DIR / filename
-        )
-
-
-        # -------------------------------------------------
-        # Save image
-        # -------------------------------------------------
+        compressed_buffer = BytesIO()
 
         image.save(
-            file_path,
-            "JPEG",
+            compressed_buffer,
+            format="JPEG",
             quality=85,
             optimize=True
         )
 
+        compressed_buffer.seek(0)
+
 
         print(
-            f"Report image saved: {file_path}"
+            "Uploading report image to Cloudinary..."
         )
 
 
         # -------------------------------------------------
-        # Return image path
+        # Upload to Cloudinary
+        # -------------------------------------------------
+
+        upload_result = cloudinary.uploader.upload(
+
+            compressed_buffer,
+
+            folder="civicmind/reports",
+
+            resource_type="image"
+
+        )
+
+
+        image_url = upload_result.get(
+            "secure_url"
+        )
+
+
+        if not image_url:
+
+            return {
+
+                "success": False,
+
+                "error":
+                    "Cloudinary did not return an image URL."
+
+            }
+
+
+        print(
+            f"Report image uploaded successfully: "
+            f"{image_url}"
+        )
+
+
+        # -------------------------------------------------
+        # Return permanent Cloudinary URL
         # -------------------------------------------------
 
         return {
@@ -1303,7 +1379,10 @@ async def upload_report_image(
             "success": True,
 
             "image_path":
-                f"/uploads/{filename}"
+                image_url,
+
+            "image_url":
+                image_url
 
         }
 
@@ -1311,20 +1390,21 @@ async def upload_report_image(
     except Exception as e:
 
         print(
-            f"Image upload error: {str(e)}"
+            f"Cloudinary upload error: {str(e)}"
         )
 
         return {
 
             "success": False,
 
-            "error": "Invalid image file."
+            "error":
+                "Image upload failed."
 
         }
 
 
 # =========================================================
-# 18. SUBMIT CIVIC REPORT
+# 20. SUBMIT CIVIC REPORT
 # =========================================================
 
 @app.post("/submit-report")
@@ -1531,7 +1611,7 @@ async def submit_report(
 
 
 # =========================================================
-# 19. GET REPORTS
+# 21. GET REPORTS
 # =========================================================
 
 @app.get("/reports")
@@ -1678,7 +1758,7 @@ async def get_reports(
 
 
 # =========================================================
-# 20. UPDATE REPORT STATUS
+# 22. UPDATE REPORT STATUS
 # =========================================================
 
 @app.patch("/reports/{report_id}/status")
@@ -1834,3 +1914,4 @@ async def update_report_status(
                 str(e)
 
         }
+
