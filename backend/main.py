@@ -1062,7 +1062,7 @@ Rules:
         ]
 
 
-        for model_name in models_to_try:
+        for model_name in models:
 
             try:
 
