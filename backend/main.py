@@ -770,7 +770,7 @@ Return JSON only. Do not use Markdown.
         # Send image to Gemini
         # -------------------------------------------------
 
-        for model_name in models_to_try:
+        for model_name in models:
 
             try:
 
