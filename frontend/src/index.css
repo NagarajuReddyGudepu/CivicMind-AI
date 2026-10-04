@@ -4159,3 +4159,69 @@ h1.pt {
     box-sizing: border-box;
     overflow: hidden;
 }
+.admin-info-box {
+    margin: 20px 0 24px;
+    padding: 18px 20px;
+    border: 1px solid #dbeafe;
+    border-radius: 12px;
+    background: #f8fbff;
+    text-align: left;
+}
+
+.admin-info-box>strong {
+    display: block;
+    margin-bottom: 8px;
+    color: #1e40af;
+    font-size: 16px;
+}
+
+.admin-info-box>span {
+    display: block;
+    color: #475569;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.admin-info-box>small {
+    display: block;
+    margin-top: 10px;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+
+/* Hackathon Demo Credentials */
+.demo-credentials {
+    margin-top: 16px;
+    padding: 15px 16px;
+    border-radius: 10px;
+    background: #ffffff;
+    border: 1px solid #dbeafe;
+}
+
+.demo-credentials>strong {
+    display: block;
+    margin-bottom: 10px;
+    color: #1e40af;
+    font-size: 15px;
+}
+
+.demo-credentials div {
+    margin: 7px 0;
+    color: #334155;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.demo-credentials div b {
+    color: #1e293b;
+}
+
+.demo-credentials small {
+    display: block;
+    margin-top: 11px;
+    color: #64748b;
+    font-size: 12.5px;
+    line-height: 1.5;
+}
