@@ -753,9 +753,9 @@ Return JSON only. Do not use Markdown.
         # Gemini model fallback list
         # -------------------------------------------------
 
-        models_to_try = [
+        models = [
+    "gemini-3.5-flash-lite",
     "gemini-3.1-flash-lite",
-    "gemini-3.7-flash"
 ]
 
 

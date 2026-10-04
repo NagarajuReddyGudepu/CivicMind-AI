@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+
+import { useState } from "react";
 import LocationPicker from "../LocationPicker";
 import {
-    generateComplaint,
     submitReport,
     uploadReportImage
 } from "../api";
@@ -17,30 +17,68 @@ export default function Complaint({
     go
 }) {
     const [edit, setEdit] = useState(false);
-    const [busy, setBusy] = useState(!complaint);
     const [sub, setSub] = useState(false);
     const [err, setErr] = useState("");
 
-    useEffect(() => {
-        if (complaint || !a) return;
+    /*
+     * Generate the complaint instantly from the AI analysis.
+     * No second Gemini API call is required.
+     */
+    const createComplaint = () => {
+        if (!a) {
+            return {
+                title: "Civic Issue Report",
+                description:
+                    "A civic issue has been identified and requires attention."
+            };
+        }
 
-        generateComplaint(a)
-            .then((r) => {
-                if (r.error) throw new Error(r.error);
+        const issue = a.issue || "Civic issue";
+        const category = a.category || "Other";
+        const severity = a.severity || "Medium";
 
-                setComplaint({
-                    title: r.title,
-                    description: r.description
-                });
-            })
-            .catch((e) =>
-                setErr(
-                    e.message ||
-                    "Could not generate the complaint."
-                )
-            )
-            .finally(() => setBusy(false));
-    }, []); // eslint-disable-line
+        let action = "Please inspect and take the necessary action to resolve this issue.";
+
+        if (category === "Road / Infrastructure") {
+            action =
+                "Please inspect and repair the affected road or infrastructure to ensure public safety.";
+        } else if (category === "Garbage / Waste") {
+            action =
+                "Please arrange for the waste to be collected and the affected area to be cleaned.";
+        } else if (category === "Streetlight") {
+            action =
+                "Please inspect and repair the streetlight or electrical infrastructure.";
+        } else if (category === "Water Leakage") {
+            action =
+                "Please inspect the affected water pipeline and repair the leakage.";
+        } else if (category === "Public Infrastructure") {
+            action =
+                "Please inspect and repair the damaged public infrastructure.";
+        } else if (category === "Fallen Tree") {
+            action =
+                "Please arrange for the fallen tree to be safely removed and restore normal public access.";
+        } else if (category === "Drainage") {
+            action =
+                "Please inspect and clear the affected drainage system to prevent further problems.";
+        }
+
+        return {
+            title: `${ issue.charAt(0).toUpperCase() }${ issue.slice(1) } `,
+            description:
+                `A ${ category.toLowerCase() } issue has been identified: ${ issue }.` +
+                `The reported severity is ${ severity }.` +
+                `${ action } `
+        };
+    };
+
+    /*
+     * Generate complaint immediately.
+     */
+    if (!complaint && a) {
+        const generated = createComplaint();
+
+        setComplaint(generated);
+    }
 
     const submit = async () => {
         setSub(true);
@@ -49,12 +87,13 @@ export default function Complaint({
         try {
             /*
              * STEP 1:
-             * Upload the original image to the backend.
+             * Upload the original image.
              */
             let imagePath = null;
 
             if (file) {
-                const imageResult = await uploadReportImage(file);
+                const imageResult =
+                    await uploadReportImage(file);
 
                 if (!imageResult.success) {
                     throw new Error(
@@ -63,39 +102,35 @@ export default function Complaint({
                     );
                 }
 
-                imagePath = imageResult.image_path;
+                imagePath =
+                    imageResult.image_path;
             }
 
             /*
              * STEP 2:
-             * Submit the complete report including image_path.
+             * Submit the complete report.
              */
             const r = await submitReport({
                 ...complaint,
                 issue: a.issue,
                 category: a.category,
                 severity: a.severity,
-                latitude: location?.[0] ?? null,
-                longitude: location?.[1] ?? null,
+                latitude:
+                    location?.[0] ?? null,
+                longitude:
+                    location?.[1] ?? null,
                 image_path: imagePath
             });
 
             if (!r.success) {
                 throw new Error(
-                    r.error || "Submission failed."
+                    r.error ||
+                    "Submission failed."
                 );
             }
 
-            /*
-             * STEP 3:
-             * Send the saved report back to App.jsx.
-             */
             setReport(r.report);
 
-            /*
-             * STEP 4:
-             * Show success page.
-             */
             go("success");
 
         } catch (e) {
@@ -103,23 +138,16 @@ export default function Complaint({
                 e.message ||
                 "Something went wrong while submitting the report."
             );
+        } finally {
+            setSub(false);
         }
-
-        setSub(false);
     };
 
-    if (busy) {
+    if (!complaint) {
         return (
             <div className="panel">
                 <p className="sub">
-                    <span
-                        className="spin"
-                        style={{
-                            borderColor: "#2563eb55",
-                            borderTopColor: "#2563eb"
-                        }}
-                    />
-                    Writing your complaint…
+                    Preparing your complaint…
                 </p>
             </div>
         );
@@ -133,51 +161,47 @@ export default function Complaint({
             </h1>
 
             <p className="sub">
-                AI has created a detailed complaint based on
-                the analysis. Please review it and make any
-                changes if needed.
+                AI has analyzed the issue and prepared
+                a complaint. Please review it and make
+                any changes if needed.
             </p>
 
             <div className="card form">
 
-                {complaint && (
-                    <>
-                        <label
-                            htmlFor="t"
-                            style={{ marginTop: 0 }}
-                        >
-                            Title
-                        </label>
+                <label
+                    htmlFor="t"
+                    style={{ marginTop: 0 }}
+                >
+                    Title
+                </label>
 
-                        <input
-                            id="t"
-                            disabled={!edit}
-                            value={complaint.title}
-                            onChange={(e) =>
-                                setComplaint({
-                                    ...complaint,
-                                    title: e.target.value
-                                })
-                            }
-                        />
+                <input
+                    id="t"
+                    disabled={!edit}
+                    value={complaint.title}
+                    onChange={(e) =>
+                        setComplaint({
+                            ...complaint,
+                            title: e.target.value
+                        })
+                    }
+                />
 
-                        <label htmlFor="d">
-                            Description
-                        </label>
+                <label htmlFor="d">
+                    Description
+                </label>
 
-                        <textarea
-                            id="d"
-                            disabled={!edit}
-                            value={complaint.description}
-                            onChange={(e) =>
-                                setComplaint({
-                                    ...complaint,
-                                    description: e.target.value
-                                })
-                            }
-                        />
-                    </>
-                )}
+                <textarea
+                    id="d"
+                    disabled={!edit}
+                    value={complaint.description}
+                    onChange={(e) =>
+                        setComplaint({
+                            ...complaint,
+                            description: e.target.value
+                        })
+                    }
+                />
 
                 <div className="meta">
 
@@ -218,7 +242,9 @@ export default function Complaint({
 
                     <button
                         className="btn ghost"
-                        onClick={() => setEdit(!edit)}
+                        onClick={() =>
+                            setEdit(!edit)
+                        }
                         disabled={sub}
                     >
                         {edit ? "Done" : "Edit"}
@@ -247,3 +273,4 @@ export default function Complaint({
         </div>
     );
 }
+

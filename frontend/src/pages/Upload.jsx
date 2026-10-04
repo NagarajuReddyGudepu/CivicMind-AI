@@ -1,3 +1,4 @@
+
 import { useRef, useState } from "react";
 
 import Icon from "../components/Icon";
@@ -28,9 +29,11 @@ export default function Upload({
             );
         }
 
-        if (f.size > 10 * 1024 * 1024) {
+        // Allow larger phone images.
+        // They will be compressed before AI analysis.
+        if (f.size > 25 * 1024 * 1024) {
             return setErr(
-                "The image is larger than 10MB. Choose a smaller one."
+                "The image is larger than 25MB. Please choose a smaller image."
             );
         }
 
@@ -40,13 +43,12 @@ export default function Upload({
     /*
      * Compress image only for AI analysis.
      *
-     * The original file remains unchanged and will still
-     * be used later for permanent report storage.
+     * The original file remains unchanged.
+     * A smaller JPEG copy is sent to Gemini.
      */
     const prepareImageForAI = (originalFile) => {
         return new Promise((resolve, reject) => {
             const img = new Image();
-
             const url = URL.createObjectURL(originalFile);
 
             img.onload = () => {
@@ -59,32 +61,33 @@ export default function Upload({
 
                 if (width > MAX_SIZE || height > MAX_SIZE) {
                     if (width > height) {
-                        height =
-                            Math.round(
-                                (height / width) *
-                                MAX_SIZE
-                            );
-
+                        height = Math.round(
+                            (height / width) * MAX_SIZE
+                        );
                         width = MAX_SIZE;
                     } else {
-                        width =
-                            Math.round(
-                                (width / height) *
-                                MAX_SIZE
-                            );
-
+                        width = Math.round(
+                            (width / height) * MAX_SIZE
+                        );
                         height = MAX_SIZE;
                     }
                 }
 
-                const canvas =
-                    document.createElement("canvas");
+                const canvas = document.createElement("canvas");
 
                 canvas.width = width;
                 canvas.height = height;
 
-                const ctx =
-                    canvas.getContext("2d");
+                const ctx = canvas.getContext("2d");
+
+                if (!ctx) {
+                    reject(
+                        new Error(
+                            "Could not prepare image."
+                        )
+                    );
+                    return;
+                }
 
                 ctx.drawImage(
                     img,
@@ -105,14 +108,13 @@ export default function Upload({
                             return;
                         }
 
-                        const compressedFile =
-                            new File(
-                                [blob],
-                                "ai-analysis.jpg",
-                                {
-                                    type: "image/jpeg"
-                                }
-                            );
+                        const compressedFile = new File(
+                            [blob],
+                            "ai-analysis.jpg",
+                            {
+                                type: "image/jpeg"
+                            }
+                        );
 
                         resolve(compressedFile);
                     },
@@ -143,14 +145,12 @@ export default function Upload({
             /*
              * Create a smaller copy for Gemini.
              */
-            const aiFile =
-                await prepareImageForAI(file);
+            const aiFile = await prepareImageForAI(file);
 
             /*
              * Send only the compressed copy to Gemini.
              */
-            const r =
-                await analyzeImage(aiFile);
+            const r = await analyzeImage(aiFile);
 
             if (r.error) {
                 throw new Error(r.error);
@@ -159,15 +159,14 @@ export default function Upload({
             setAnalysis(r);
 
             go("analysis");
-
         } catch (e) {
             setErr(
                 e.message ||
                 "Analysis failed. Check that the backend is running."
             );
+        } finally {
+            setBusy(false);
         }
-
-        setBusy(false);
     };
 
     return (
@@ -188,9 +187,7 @@ export default function Upload({
                 }
                 role="button"
                 tabIndex={0}
-                onClick={() =>
-                    ref.current.click()
-                }
+                onClick={() => ref.current.click()}
                 onKeyDown={(e) =>
                     e.key === "Enter" &&
                     ref.current.click()
@@ -199,18 +196,16 @@ export default function Upload({
                     e.preventDefault();
                     setOver(true);
                 }}
-                onDragLeave={() =>
-                    setOver(false)
-                }
+                onDragLeave={() => setOver(false)}
                 onDrop={(e) => {
                     e.preventDefault();
                     setOver(false);
+
                     pick(
                         e.dataTransfer.files[0]
                     );
                 }}
             >
-
                 {preview ? (
                     <img
                         src={preview}
@@ -229,7 +224,7 @@ export default function Upload({
                         </small>
 
                         <small>
-                            JPG, JPEG, PNG • Max 10MB
+                            JPG, JPEG, PNG • Max 25MB
                         </small>
                     </>
                 )}
@@ -243,7 +238,6 @@ export default function Upload({
                         pick(e.target.files[0])
                     }
                 />
-
             </div>
 
             {err && (
@@ -274,3 +268,4 @@ export default function Upload({
         </div>
     );
 }
+
