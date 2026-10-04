@@ -591,8 +591,52 @@ async def login(
             "error": f"Login failed: {str(e)}"
 
         }
+# =========================================================
+# 15. GET ALL USERS - ADMIN ONLY
+# =========================================================
 
+@app.get("/users")
+async def get_users(
+    current_user: dict = Depends(require_admin)
+):
 
+    try:
+
+        query = text("""
+            SELECT
+                id,
+                name,
+                email,
+                role,
+                created_at
+            FROM users
+            ORDER BY created_at DESC
+        """)
+
+        with engine.connect() as connection:
+
+            result = connection.execute(query)
+
+            users = [
+                dict(row)
+                for row in result.mappings().all()
+            ]
+
+        return {
+            "success": True,
+            "users": users
+        }
+
+    except Exception as e:
+
+        print(
+            f"Get users error: {str(e)}"
+        )
+
+        return {
+            "success": False,
+            "error": str(e)
+        }
 # =========================================================
 # 15. IMAGE ANALYSIS ENDPOINT
 # =========================================================

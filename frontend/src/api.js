@@ -101,3 +101,10 @@ export async function registerUser(name, email, password, role) {
 
     return await response.json();
 }
+// Get all users - ADMIN REQUIRED
+export const getUsers = () =>
+    fetch(BASE + "/users", {
+        headers: {
+            ...authHeaders(),
+        },
+    }).then((r) => r.json());

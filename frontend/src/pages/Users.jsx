@@ -1,32 +1,45 @@
-import { useMemo, useState } from "react";
+
+import { useEffect, useState } from "react";
 import Icon from "../components/Icon";
+import { getUsers } from "../api";
 
 export default function Users({ currentUser }) {
     const [search, setSearch] = useState("");
+    const [users, setUsers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
 
-    /*
-     * Currently we only have the logged-in user available
-     * on the frontend.
-     *
-     * Once a backend /users API is added, this list can be
-     * replaced with the complete database user list.
-     */
-    const users = useMemo(() => {
-        if (!currentUser) return [];
+    useEffect(() => {
+        loadUsers();
+    }, []);
 
-        return [
-            {
-                id: currentUser.user_id || currentUser.id || 1,
-                name: currentUser.name || "Administrator",
-                email: currentUser.email || "admin@civicmind.ai",
-                role: currentUser.role || "admin",
-                status: "Active"
+    const loadUsers = async () => {
+        setLoading(true);
+        setError("");
+
+        try {
+            const data = await getUsers();
+
+            if (!data.success) {
+                throw new Error(
+                    data.error || "Could not load users."
+                );
             }
-        ];
-    }, [currentUser]);
+
+            setUsers(data.users || []);
+        } catch (err) {
+            console.error("Users loading error:", err);
+
+            setError(
+                "Could not load users. Please check that the backend is running."
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const filteredUsers = users.filter((u) =>
-        `${u.name} ${u.email} ${u.role}`
+        `${ u.name } ${ u.email } ${ u.role } `
             .toLowerCase()
             .includes(search.toLowerCase())
     );
@@ -38,6 +51,8 @@ export default function Users({ currentUser }) {
     const adminCount = users.filter(
         (u) => u.role === "admin"
     ).length;
+
+    const activeCount = users.length;
 
     return (
         <div className="panel wide">
@@ -103,11 +118,7 @@ export default function Users({ currentUser }) {
                 <div className="card stat">
                     <div>
                         <small>Active Users</small>
-                        <strong>
-                            {users.filter(
-                                (u) => u.status === "Active"
-                            ).length}
-                        </strong>
+                        <strong>{activeCount}</strong>
                     </div>
 
                     <span className="sico active-stat">
@@ -153,7 +164,39 @@ export default function Users({ currentUser }) {
                 </div>
 
 
-                {filteredUsers.length > 0 ? (
+                {loading ? (
+
+                    <div className="users-empty">
+                        <span className="users-empty-icon">
+                            <Icon n="users" />
+                        </span>
+
+                        <h3>
+                            Loading users...
+                        </h3>
+
+                        <p>
+                            Fetching registered accounts.
+                        </p>
+                    </div>
+
+                ) : error ? (
+
+                    <div className="users-empty">
+                        <span className="users-empty-icon">
+                            <Icon n="users" />
+                        </span>
+
+                        <h3>
+                            Unable to load users
+                        </h3>
+
+                        <p>
+                            {error}
+                        </p>
+                    </div>
+
+                ) : filteredUsers.length > 0 ? (
 
                     <div className="users-table">
 
@@ -216,7 +259,7 @@ export default function Users({ currentUser }) {
 
                                     <span className="user-status">
                                         <span className="status-dot"></span>
-                                        {u.status}
+                                        Active
                                     </span>
 
                                 </div>
@@ -273,3 +316,4 @@ export default function Users({ currentUser }) {
         </div>
     );
 }
+
